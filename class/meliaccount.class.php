@@ -151,11 +151,24 @@ class MeliAccount
 			'grant_type' => 'authorization_code', 'client_id' => MeliConfig::appId(), 'client_secret' => MeliConfig::appSecret(),
 			'code' => $code, 'redirect_uri' => MeliConfig::redirectUrl(), 'code_verifier' => (string) dolDecrypt($row['oauth_verifier']),
 		));
-		if ($answer === null) {
+		if ($answer === null || !$this->storeTokens($answer, true)) {
 			return false;
 		}
+		// Who was connected: shown on the setup page, and the seller id the notifications must carry.
+		$token = is_string($answer['access_token'] ?? null) ? $answer['access_token'] : '';
+		$http = MeliHttp::send('GET', MeliConfig::apiUrl().'/users/me', array('Authorization' => 'Bearer '.$token), '');
+		$me = ($http['status'] === 200) ? json_decode($http['body'], true) : null;
+		if (is_array($me)) {
+			$tags = (isset($me['tags']) && is_array($me['tags'])) ? implode(',', array_filter($me['tags'], 'is_string')) : '';
+			$this->save(array_filter(array(
+				'ml_user_id' => is_numeric($me['id'] ?? null) ? (int) $me['id'] : null, 'nickname' => is_string($me['nickname'] ?? null) ? dol_trunc($me['nickname'], 120, 'right', 'UTF-8', 1) : null,
+				'site_id' => is_string($me['site_id'] ?? null) ? substr($me['site_id'], 0, 8) : MeliConfig::SITE, 'tags' => dol_trunc($tags, 250, 'right', 'UTF-8', 1),
+			), function ($value) {
+				return $value !== null;
+			}));
+		}
 
-		return $this->storeTokens($answer, true);
+		return true;
 	}
 
 	/**
@@ -182,9 +195,16 @@ class MeliAccount
 
 		$lock = new MeliLock($this->db);
 		$key = 'token:'.((int) $row['rowid']);
-		if (!$lock->acquire($key, 60)) {
-			$this->fail('busy', 'Another process is renewing the token');
-			return '';
+		// Another process renewing the token holds the lease for one call to Mercado Libre: wait for
+		// it, then use what it stored. Refreshing in parallel would burn the single-use refresh token.
+		$waited = 0;
+		while (!$lock->acquire($key, 60)) {
+			if ($waited >= 15000) {
+				$this->fail('busy', 'Another process is renewing the token');
+				return '';
+			}
+			usleep(250000);
+			$waited += 250;
 		}
 		$token = '';
 		$row = $this->fetch();

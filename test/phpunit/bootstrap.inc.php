@@ -44,6 +44,10 @@ require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
 require_once dirname(__DIR__, 2).'/class/meliinbox.class.php';
 require_once dirname(__DIR__, 2).'/class/melicron.class.php';
 require_once dirname(__DIR__, 2).'/core/modules/modMeli.class.php';
+require_once dirname(__DIR__).'/fake/FakeClient.php';
+if (!function_exists('dolEncrypt')) {
+	require_once DOL_DOCUMENT_ROOT.'/core/lib/security.lib.php';
+}
 
 if (empty($user->id)) {
 	$user->fetch(1);
@@ -477,5 +481,166 @@ abstract class MeliTestCase extends PHPUnit\Framework\TestCase
 			meli_test_set_global($name, $value);
 		}
 		parent::tearDown();
+	}
+}
+
+/**
+ * Base of the tests that talk to the fake Mercado Libre: one fake per class, reset before each test,
+ * the module pointed at it in memory, and the entity's account row saved and put back as found.
+ */
+abstract class MeliFakeTestCase extends MeliTestCase
+{
+	/**
+	 * Settings of the fake's application
+	 */
+	const APP_ID = '1234567890123456';
+	const APP_SECRET = 'fake-client-secret';
+	const REDIRECT = 'https://shop.example.test/custom/meli/public/oauth.php';
+
+	/**
+	 * @var MeliFakeClient|null
+	 */
+	protected static $fake;
+
+	/**
+	 * @var list<array<string, string|null>>	Account rows of the entity found before the test
+	 */
+	private $savedAccounts = array();
+
+	/**
+	 * Start the fake.
+	 *
+	 * @return	void
+	 */
+	public static function setUpBeforeClass(): void
+	{
+		parent::setUpBeforeClass();
+		self::$fake = MeliFakeClient::start();
+	}
+
+	/**
+	 * Stop the fake.
+	 *
+	 * @return	void
+	 */
+	public static function tearDownAfterClass(): void
+	{
+		if (self::$fake !== null) {
+			self::$fake->stop();
+			self::$fake = null;
+		}
+		parent::tearDownAfterClass();
+	}
+
+	/**
+	 * Point the module at a fresh fake, with no account connected yet.
+	 *
+	 * @return	void
+	 */
+	protected function setUp(): void
+	{
+		/**
+		 * @var Conf $conf
+		 * @var DoliDB $db
+		 */
+		global $conf, $db;
+
+		parent::setUp();
+		$this->fake()->reset();
+		meli_test_set_global('MELI_API_URL', $this->fake()->apiUrl());
+		meli_test_set_global('MELI_AUTH_URL', $this->fake()->authUrl());
+		meli_test_set_global('MELI_APP_ID', self::APP_ID);
+		meli_test_set_global('MELI_APP_SECRET', dolEncrypt(self::APP_SECRET));
+		meli_test_set_global('MELI_REDIRECT_URL', self::REDIRECT);
+
+		$table = $db->prefix().'meli_account';
+		$resql = $db->query("SELECT * FROM ".$table." WHERE entity = ".((int) $conf->entity));
+		while ($resql && $resql !== true && is_array($raw = $db->fetch_array($resql))) {
+			$row = array();
+			foreach ($raw as $column => $value) {
+				if (is_string($column)) {
+					$row[$column] = ($value === null ? null : meli_test_str($value));
+				}
+			}
+			$this->savedAccounts[] = $row;
+		}
+		$db->query("DELETE FROM ".$table." WHERE entity = ".((int) $conf->entity));
+	}
+
+	/**
+	 * Put the account row back as found.
+	 *
+	 * @return	void
+	 */
+	protected function tearDown(): void
+	{
+		/**
+		 * @var Conf $conf
+		 * @var DoliDB $db
+		 */
+		global $conf, $db;
+
+		$table = $db->prefix().'meli_account';
+		$db->query("DELETE FROM ".$table." WHERE entity = ".((int) $conf->entity));
+		foreach ($this->savedAccounts as $row) {
+			$values = array();
+			foreach ($row as $value) {
+				$values[] = ($value === null ? 'NULL' : "'".$db->escape($value)."'");
+			}
+			$db->query("INSERT INTO ".$table." (".implode(', ', array_keys($row)).") VALUES (".implode(', ', $values).")");
+		}
+		$this->savedAccounts = array();
+		$db->query("DELETE FROM ".$db->prefix()."meli_lock WHERE lock_key LIKE 'token:%' AND (locked_until IS NULL OR locked_until < '".$db->idate(dol_now())."')");
+		parent::tearDown();
+	}
+
+	/**
+	 * The fake.
+	 *
+	 * @return	MeliFakeClient
+	 */
+	protected function fake()
+	{
+		if (self::$fake === null) {
+			throw new LogicException('fake not started');
+		}
+
+		return self::$fake;
+	}
+
+	/**
+	 * Connect the account through the whole authorisation flow.
+	 *
+	 * @return	void
+	 */
+	protected function connect()
+	{
+		/**
+		 * @var DoliDB $db
+		 * @var User $user
+		 */
+		global $db, $user;
+
+		$account = new MeliAccount($db);
+		$url = $account->authorizationUrl($user);
+		$this->assertStringStartsWith($this->fake()->authUrl().'/authorization?', $url);
+		$answer = $this->fake()->request('GET', substr($url, strlen($this->fake()->authUrl())));
+		$back = MeliFakeClient::redirectParams($answer);
+		$this->assertTrue($account->finishAuthorization($user, meli_test_str($back['state'] ?? ''), meli_test_str($back['code'] ?? '')), $account->error.' '.$account->message);
+	}
+
+	/**
+	 * Requests the fake received, as "METHOD /path".
+	 *
+	 * @return	list<string>
+	 */
+	protected function calls()
+	{
+		$calls = array();
+		foreach ($this->fake()->log() as $entry) {
+			$calls[] = meli_test_str($entry['method'] ?? '').' '.meli_test_str($entry['path'] ?? '');
+		}
+
+		return $calls;
 	}
 }
