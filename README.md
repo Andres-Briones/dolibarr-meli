@@ -78,8 +78,9 @@ Do not connect it to a real account yet.
   off Mercado Libre. For unique pieces sold in several places, choose per
   product; the default is 0.
 - **Invoicing.** Turn `MELI_INVOICE_ORDERS` off only if invoices are issued
-  with Mercado Libre's own Facturador. Then the `arca` module must not
-  invoice these orders, or the sale is invoiced twice at ARCA.
+  with Mercado Libre's own Facturador. The `arca` module then stops sending
+  the invoices of these orders by itself (it reads this setting), so that no
+  sale is reported twice at ARCA.
 
 ## Personal data
 

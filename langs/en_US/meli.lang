@@ -94,7 +94,7 @@ MeliShippingProduct=Service for shipping
 MeliShippingProductHelp=What the buyer pays for shipping is added to the order with this service. Without one, as a free line.
 MeliWebhookIps=IP addresses accepted for notifications
 MeliWebhookIpsHelp=Empty = all. Notifications carry no data: the module always reads the sale again from Mercado Libre.
-MeliInvoiceOffWarning=Mercado Libre sales are not invoiced here. Use this only if you invoice with Mercado Libre's Facturador; then the ARCA module must not invoice these orders (an extra invoice is reported to ARCA and can only be cancelled by a credit note).
+MeliInvoiceOffWarning=Mercado Libre sales are not invoiced here. Use this only if you invoice with Mercado Libre's Facturador: the ARCA module then stops sending the invoices of these orders by itself, so that no sale is reported twice.
 
 # Listings tab
 MeliCannotLink=Cannot link to "%s": no such product, or it has variants (link each variant).

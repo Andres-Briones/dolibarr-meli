@@ -94,7 +94,7 @@ MeliShippingProduct=Servicio para el envío
 MeliShippingProductHelp=Lo que el comprador paga de envío se agrega al pedido con este servicio. Sin servicio, va como línea libre.
 MeliWebhookIps=Direcciones IP aceptadas para las notificaciones
 MeliWebhookIpsHelp=Vacío = todas. Las notificaciones no traen datos: el módulo siempre vuelve a leer la venta en Mercado Libre.
-MeliInvoiceOffWarning=Las ventas de Mercado Libre no se facturan acá. Usalo solo si facturás con el Facturador de Mercado Libre; en ese caso, el módulo ARCA no debe facturar estos pedidos (una factura de más se informa a ARCA y solo se anula con nota de crédito).
+MeliInvoiceOffWarning=Las ventas de Mercado Libre no se facturan acá. Usalo solo si facturás con el Facturador de Mercado Libre: en ese caso el módulo ARCA deja de enviar por sí solo las facturas de estos pedidos, para que ninguna venta se informe dos veces.
 
 # Listings tab
 MeliCannotLink=No se puede vincular con "%s": no existe ese producto, o tiene variantes (vinculá cada variante).
