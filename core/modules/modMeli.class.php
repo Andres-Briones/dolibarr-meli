@@ -59,7 +59,7 @@ class modMeli extends DolibarrModules
 			'triggers' => 1,
 		);
 		$this->dirs = array('/meli');
-		$this->config_page_url = array('setup.php@meli');
+		$this->config_page_url = array('guide.php@meli');
 		$this->depends = array('modProduct', 'modCommande', 'modSociete');
 		$this->requiredby = array();
 		$this->conflictwith = array();

@@ -18,3 +18,111 @@ MeliCronPolling=Mercado Libre: control de ventas
 MeliCronPollingDesc=Busca las notificaciones que Mercado Libre no pudo entregar y las ventas actualizadas desde la última vez, y lee los envíos abiertos.
 MeliCronNightly=Mercado Libre: revisión diaria
 MeliCronNightlyDesc=Vuelve a leer las publicaciones, reenvía el stock de todos los productos vinculados y borra datos viejos.
+
+# Setup
+MeliSetup=Configuración de Mercado Libre
+MeliGuideTab=Primeros pasos
+MeliListingsTab=Publicaciones
+MeliSalesTab=Ventas
+MeliFakeBanner=Conectado a un simulador de Mercado Libre, no al real: nada de lo que se ve acá existe en Mercado Libre.
+MeliPushOn=se envía
+MeliPushOff=solo lectura
+MeliPushState=Stock hacia Mercado Libre:
+PaymentTypeMELI=Mercado Libre
+PaymentTypeShortMELI=Mercado Libre
+
+# Guide
+MeliGuideIntro=Estos pasos se hacen una sola vez, en este orden. Hasta el paso 7 el módulo solo lee: no cambia nada en tus publicaciones.
+MeliGuideStep=Paso
+MeliGuideGoThere=Ir a la pantalla
+MeliGuideByYou=lo hacés vos
+MeliGuideDone=Hecho
+MeliGuideToDo=Pendiente
+MeliGuideStepSku=Poné el SKU en cada publicación
+MeliGuideStepSkuText=En Mercado Libre, en cada publicación (y en cada variante: talle, color...), completá el campo "SKU" con la referencia exacta del producto en Dolibarr.\nAsí el módulo sabe qué producto vende cada publicación. Una publicación sin SKU, o con un SKU que no existe en Dolibarr, queda sin vincular y su stock no se toca.
+MeliGuideStepApp=Creá la aplicación en Mercado Libre
+MeliGuideStepAppText=Entrá a developers.mercadolibre.com.ar con la cuenta del negocio y creá una aplicación (menú "Mis aplicaciones"; los nombres de los menús pueden cambiar).\n- URI de redirect: copiá la "Dirección de vuelta" de la pestaña Configuración.\n- Permisos: lectura, escritura y acceso sin conexión (offline_access).\n- Notificaciones: copiá la "Dirección de notificaciones" y marcá los temas Orders (orders_v2), Items y Shipments.\nAl guardar, Mercado Libre te da el "App ID" y la "Secret Key": copialos en la pestaña Configuración.
+MeliGuideStepConnect=Conectá la cuenta
+MeliGuideStepConnectText=En la pestaña Configuración, apretá "Conectar con Mercado Libre" y aceptá con la cuenta del negocio. Si Mercado Libre corta la conexión (cambio de contraseña, cuatro meses sin uso), la pantalla lo avisa y se vuelve a conectar igual.
+MeliGuideStepSettings=Completá la configuración
+MeliGuideStepSettingsText=Elegí:\n- el usuario de Dolibarr con el que se registran las ventas (conviene uno propio, por ejemplo "mercadolibre", con permiso de crear pedidos y facturas);\n- los almacenes cuyo stock se ofrece en Mercado Libre;\n- la cuenta bancaria donde se registra lo que cobra Mercado Libre (la de Mercado Pago, normalmente);\n- el servicio "Envío" para lo que el comprador paga de envío.\nLas ventas de Mercado Libre se facturan solas: el pedido, la factura y el cobro. Si tenés el módulo ARCA, la factura pide su CAE como cualquier otra.
+MeliGuideStepLinks=Revisá las publicaciones
+MeliGuideStepLinksText=En la pestaña Publicaciones apretá "Leer publicaciones" (en Configuración) y mirá las que quedaron sin vincular: corregí el SKU en Mercado Libre, o escribí a mano la referencia del producto. Las que no querés que el módulo toque, marcalas como ignoradas.
+MeliGuideStepBuffer=Decidí la reserva de cada producto
+MeliGuideStepBufferText=La reserva son unidades que no se ofrecen en Mercado Libre aunque estén en stock. Para piezas únicas, que se venden también en el local o en la tienda online, una reserva de 0 deja la última unidad en todos los canales a la vez: si se vende en dos lados en el mismo minuto, una de las ventas queda "vendida sin stock" y hay que cancelarla. Con reserva 1, Mercado Libre no ofrece la última unidad.\nSe pone una reserva general en Configuración, y otra por publicación en la pestaña Publicaciones. Es una decisión de ustedes, producto por producto.
+MeliGuideStepPush=Encendé el envío de stock
+MeliGuideStepPushText=Cuando las publicaciones estén bien vinculadas, poné "Enviar el stock a Mercado Libre" en Sí. Desde ese momento, cada movimiento de stock en Dolibarr cambia la cantidad disponible en Mercado Libre en uno o dos minutos, y todas las noches se vuelve a enviar todo.
+MeliGuideStepDaily=Todos los días: mirá la pestaña Ventas
+MeliGuideStepDailyText=Las ventas que necesitan a una persona aparecen arriba: vendidas sin stock, con un producto desconocido, o canceladas en Mercado Libre después de facturarlas (esas llevan nota de crédito, que se hace a mano). Desde ahí también se descarga la etiqueta de envío.
+
+# Setup tab
+MeliAppMissing=Falta el App ID o la Secret Key de la aplicación.
+MeliDisconnected=La cuenta quedó desconectada.
+MeliListingsFailed=No se pudieron leer las publicaciones: %s
+MeliListingsRead=%s publicaciones leídas: %s vinculadas, %s sin vincular.
+MeliConnection=Conexión
+MeliStatusConnected=Conectada
+MeliStatusReconnect=Hay que volver a conectar
+MeliStatusDisconnected=Sin conectar
+MeliRedirectUrl=Dirección de vuelta (URI de redirect)
+MeliWebhookUrl=Dirección de notificaciones
+MeliWebhookTopics=Temas: Orders (orders_v2), Items, Shipments.
+MeliReadListings=Leer publicaciones
+MeliDisconnect=Desconectar
+MeliConnect=Conectar con Mercado Libre
+MeliAppId=App ID
+MeliAppIdHelp=El número que muestra Mercado Libre para tu aplicación.
+MeliAppSecret=Secret Key
+MeliAppSecretHelp=Se guarda cifrada y no se vuelve a mostrar. Dejalo vacío para conservar la guardada.
+MeliSecretStored=(guardada)
+MeliTechnicalUser=Usuario que registra las ventas
+MeliTechnicalUserHelp=Necesita permiso para crear pedidos, facturas y cobros.
+MeliWarehouses=Almacenes ofrecidos en Mercado Libre
+MeliWarehousesHelp=El stock de estos almacenes, menos lo que ya está comprometido en pedidos validados, es lo que se ofrece.
+MeliBuffer=Reserva
+MeliBufferHelp=Unidades de cada producto que no se ofrecen en Mercado Libre. Cada publicación puede tener la suya.
+MeliMaxQty=Cantidad máxima ofrecida
+MeliMaxQtyHelp=0 = sin máximo. Para productos sin control de stock se ofrece este máximo, o 99.
+MeliPushStock=Enviar el stock a Mercado Libre
+MeliPushStockHelp=Mientras esté en No, el módulo solo lee: no cambia ninguna cantidad en Mercado Libre.
+MeliInvoiceOrders=Facturar las ventas de Mercado Libre
+MeliInvoiceOrdersHelp=Sí: cada venta pagada se registra como pedido, factura validada y cobro.
+MeliBankAccount=Cuenta para los cobros de Mercado Libre
+MeliBankAccountHelp=Se registra lo que pagó el comprador, envío incluido. Las comisiones de Mercado Libre no se descuentan acá.
+MeliPaymentMode=Forma de pago de los cobros
+MeliShippingProduct=Servicio para el envío
+MeliShippingProductHelp=Lo que el comprador paga de envío se agrega al pedido con este servicio. Sin servicio, va como línea libre.
+MeliWebhookIps=Direcciones IP aceptadas para las notificaciones
+MeliWebhookIpsHelp=Vacío = todas. Las notificaciones no traen datos: el módulo siempre vuelve a leer la venta en Mercado Libre.
+MeliInvoiceOffWarning=Las ventas de Mercado Libre no se facturan acá. Usalo solo si facturás con el Facturador de Mercado Libre; en ese caso, el módulo ARCA no debe facturar estos pedidos (una factura de más se informa a ARCA y solo se anula con nota de crédito).
+
+# Listings tab
+MeliCannotLink=No se puede vincular con "%s": no existe ese producto, o tiene variantes (vinculá cada variante).
+MeliListingsIntro=Cada publicación (o variante) se vincula con el producto cuya referencia es su SKU. Podés escribir otra referencia a mano: ese vínculo ya no cambia con el SKU. Dejá la referencia vacía para volver al SKU.
+MeliFilterAll=Activas
+MeliFilterUnlinked=Sin vincular
+MeliFilterIgnored=Ignoradas
+MeliFilterGone=Ya no están en Mercado Libre
+MeliListing=Publicación
+MeliQtyOnMl=En Mercado Libre
+MeliQtySent=Enviada
+MeliLinkedByHand=Vinculada a mano
+MeliReason_no_sku=Sin SKU en Mercado Libre
+MeliReason_no_product=Ningún producto tiene esta referencia
+MeliReason_several_products=Varios productos con esta referencia
+MeliReason_variant_parent=El producto tiene variantes: vinculá cada variante
+MeliBufferBlank=reserva vacía = la general
+MeliIgnore=Ignorar
+MeliUnignore=Volver a tener en cuenta
+
+# Sales tab
+MeliSalesIntro=Las ventas pagadas en Mercado Libre. Arriba, las que necesitan que alguien las mire.
+MeliSale=Venta
+MeliShipment=Envío
+MeliOversold=Vendida sin stock
+MeliNeedsReview=Revisar
+MeliMarkReviewed=Ya la revisé
+MeliInvoiceNow=Facturar ahora
+MeliGetLabel=Descargar etiqueta
+MeliLabelFailed=No se pudo descargar la etiqueta: %s
+MeliLabelSaved=Etiqueta guardada en los documentos del pedido: %s

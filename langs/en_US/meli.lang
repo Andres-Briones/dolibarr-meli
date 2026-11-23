@@ -18,3 +18,111 @@ MeliCronPolling=Mercado Libre: sales check
 MeliCronPollingDesc=Fetches the notifications Mercado Libre could not deliver and the sales updated since the last run, and reads open shipments.
 MeliCronNightly=Mercado Libre: daily review
 MeliCronNightlyDesc=Reads the listings again, sends the stock of every linked product again and deletes old data.
+
+# Setup
+MeliSetup=Mercado Libre setup
+MeliGuideTab=First steps
+MeliListingsTab=Listings
+MeliSalesTab=Sales
+MeliFakeBanner=Connected to a Mercado Libre simulator, not to the real one: nothing shown here exists on Mercado Libre.
+MeliPushOn=sent
+MeliPushOff=read only
+MeliPushState=Stock to Mercado Libre:
+PaymentTypeMELI=Mercado Libre
+PaymentTypeShortMELI=Mercado Libre
+
+# Guide
+MeliGuideIntro=These steps are done once, in this order. Until step 7 the module only reads: it changes nothing in your listings.
+MeliGuideStep=Step
+MeliGuideGoThere=Go to the page
+MeliGuideByYou=done by you
+MeliGuideDone=Done
+MeliGuideToDo=To do
+MeliGuideStepSku=Put the SKU on every listing
+MeliGuideStepSkuText=On Mercado Libre, fill the "SKU" field of every listing (and every variation: size, colour...) with the exact ref of the product in Dolibarr.\nThat is how the module knows which product each listing sells. A listing without a SKU, or whose SKU does not exist in Dolibarr, stays unlinked and its stock is left alone.
+MeliGuideStepApp=Create the application at Mercado Libre
+MeliGuideStepAppText=Log in to developers.mercadolibre.com.ar with the business account and create an application ("My applications"; menu names may change).\n- Redirect URI: copy the "Return address" from the Settings tab.\n- Scopes: read, write and offline access (offline_access).\n- Notifications: copy the "Notifications address" and tick the topics Orders (orders_v2), Items and Shipments.\nOnce saved, Mercado Libre shows the "App ID" and the "Secret Key": copy them into the Settings tab.
+MeliGuideStepConnect=Connect the account
+MeliGuideStepConnectText=In the Settings tab, press "Connect to Mercado Libre" and accept with the business account. If Mercado Libre drops the connection (password change, four months unused), the page says so and you connect again the same way.
+MeliGuideStepSettings=Fill in the settings
+MeliGuideStepSettingsText=Choose:\n- the Dolibarr user sales are recorded with (preferably a dedicated one, e.g. "mercadolibre", allowed to create orders and invoices);\n- the warehouses whose stock is offered on Mercado Libre;\n- the bank account where what Mercado Libre collects is recorded (usually the Mercado Pago one);\n- the "Shipping" service for what the buyer pays for shipping.\nMercado Libre sales are invoiced by themselves: order, invoice and payment. With the ARCA module, the invoice asks for its CAE like any other.
+MeliGuideStepLinks=Check the listings
+MeliGuideStepLinksText=Press "Read listings" (in Settings) and look at the unlinked ones in the Listings tab: fix the SKU on Mercado Libre, or type the product ref by hand. Mark as ignored those the module must not touch.
+MeliGuideStepBuffer=Decide each product's buffer
+MeliGuideStepBufferText=The buffer is units not offered on Mercado Libre although in stock. For unique pieces also sold in the shop or online, a buffer of 0 offers the last unit on every channel at once: if it sells in two places in the same minute, one sale is "oversold" and must be cancelled. With a buffer of 1, Mercado Libre does not offer the last unit.\nThere is a general buffer in Settings and one per listing in the Listings tab. It is your decision, product by product.
+MeliGuideStepPush=Switch the stock push on
+MeliGuideStepPushText=Once the listings are linked correctly, set "Send stock to Mercado Libre" to Yes. From then on, every stock movement in Dolibarr changes the quantity on Mercado Libre within a minute or two, and everything is sent again every night.
+MeliGuideStepDaily=Every day: look at the Sales tab
+MeliGuideStepDailyText=Sales that need a person come first: oversold, with an unknown product, or cancelled on Mercado Libre after being invoiced (those need a credit note, made by hand). The shipping label is downloaded from there too.
+
+# Setup tab
+MeliAppMissing=The application's App ID or Secret Key is missing.
+MeliDisconnected=The account is disconnected.
+MeliListingsFailed=The listings could not be read: %s
+MeliListingsRead=%s listings read: %s linked, %s not linked.
+MeliConnection=Connection
+MeliStatusConnected=Connected
+MeliStatusReconnect=Must be connected again
+MeliStatusDisconnected=Not connected
+MeliRedirectUrl=Return address (redirect URI)
+MeliWebhookUrl=Notifications address
+MeliWebhookTopics=Topics: Orders (orders_v2), Items, Shipments.
+MeliReadListings=Read listings
+MeliDisconnect=Disconnect
+MeliConnect=Connect to Mercado Libre
+MeliAppId=App ID
+MeliAppIdHelp=The number Mercado Libre shows for your application.
+MeliAppSecret=Secret Key
+MeliAppSecretHelp=Stored encrypted and never shown again. Leave empty to keep the stored one.
+MeliSecretStored=(stored)
+MeliTechnicalUser=User recording the sales
+MeliTechnicalUserHelp=Needs the right to create orders, invoices and payments.
+MeliWarehouses=Warehouses offered on Mercado Libre
+MeliWarehousesHelp=The stock of these warehouses, minus what validated orders already hold, is what is offered.
+MeliBuffer=Buffer
+MeliBufferHelp=Units of each product not offered on Mercado Libre. Each listing may have its own.
+MeliMaxQty=Highest quantity offered
+MeliMaxQtyHelp=0 = no maximum. Products without stock control are offered this maximum, or 99.
+MeliPushStock=Send stock to Mercado Libre
+MeliPushStockHelp=While No, the module only reads: it changes no quantity on Mercado Libre.
+MeliInvoiceOrders=Invoice Mercado Libre sales
+MeliInvoiceOrdersHelp=Yes: every paid sale is recorded as an order, a validated invoice and a payment.
+MeliBankAccount=Account for Mercado Libre payments
+MeliBankAccountHelp=What the buyer paid is recorded, shipping included. Mercado Libre's fees are not deducted here.
+MeliPaymentMode=Payment mode of these payments
+MeliShippingProduct=Service for shipping
+MeliShippingProductHelp=What the buyer pays for shipping is added to the order with this service. Without one, as a free line.
+MeliWebhookIps=IP addresses accepted for notifications
+MeliWebhookIpsHelp=Empty = all. Notifications carry no data: the module always reads the sale again from Mercado Libre.
+MeliInvoiceOffWarning=Mercado Libre sales are not invoiced here. Use this only if you invoice with Mercado Libre's Facturador; then the ARCA module must not invoice these orders (an extra invoice is reported to ARCA and can only be cancelled by a credit note).
+
+# Listings tab
+MeliCannotLink=Cannot link to "%s": no such product, or it has variants (link each variant).
+MeliListingsIntro=Each listing (or variation) is linked to the product whose ref is its SKU. You may type another ref by hand: that link no longer follows the SKU. Leave the ref empty to go back to the SKU.
+MeliFilterAll=Active
+MeliFilterUnlinked=Not linked
+MeliFilterIgnored=Ignored
+MeliFilterGone=No longer on Mercado Libre
+MeliListing=Listing
+MeliQtyOnMl=On Mercado Libre
+MeliQtySent=Sent
+MeliLinkedByHand=Linked by hand
+MeliReason_no_sku=No SKU on Mercado Libre
+MeliReason_no_product=No product has this ref
+MeliReason_several_products=Several products have this ref
+MeliReason_variant_parent=The product has variants: link each variant
+MeliBufferBlank=empty buffer = the general one
+MeliIgnore=Ignore
+MeliUnignore=Take into account again
+
+# Sales tab
+MeliSalesIntro=Sales paid on Mercado Libre. Those that need someone to look at them come first.
+MeliSale=Sale
+MeliShipment=Shipment
+MeliOversold=Oversold
+MeliNeedsReview=Review
+MeliMarkReviewed=Reviewed
+MeliInvoiceNow=Invoice now
+MeliGetLabel=Download label
+MeliLabelFailed=The label could not be downloaded: %s
+MeliLabelSaved=Label saved in the order's documents: %s

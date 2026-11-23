@@ -30,10 +30,10 @@
 /**
  * Fake Mercado Libre. One instance handles one request against the state loaded from the state file.
  *
- * @phpstan-type Delivery array{url:string,body:string,delay_ms:int,timeout_ms:int}
- * @phpstan-type DeliveryResult array{url:string,body:string,status:int,duration_ms:int,error:string}
- * @phpstan-type Reply array{status:int,headers:array<string,string>,body:string,delay_ms:int,drop:bool,deliveries:list<Delivery>}
- * @phpstan-type Row array<string,mixed>
+ * @phpstan-type FakeDelivery array{url:string,body:string,delay_ms:int,timeout_ms:int}
+ * @phpstan-type FakeDeliveryResult array{url:string,body:string,status:int,duration_ms:int,error:string}
+ * @phpstan-type FakeReply array{status:int,headers:array<string,string>,body:string,delay_ms:int,drop:bool,deliveries:list<FakeDelivery>}
+ * @phpstan-type FakeRow array<string,mixed>
  */
 class MeliFakeRouter
 {
@@ -66,7 +66,7 @@ class MeliFakeRouter
 	private $log = array();
 
 	/**
-	 * @var list<Delivery> Notifications to POST to the webhook once the state lock is released
+	 * @var list<FakeDelivery> Notifications to POST to the webhook once the state lock is released
 	 */
 	private $deliveries = array();
 
@@ -231,6 +231,23 @@ class MeliFakeRouter
 	}
 
 	/**
+	 * Split a comma-separated list, trimmed, without empty entries.
+	 *
+	 * @param	string	$value	List
+	 * @return	list<string>
+	 */
+	public static function csv($value)
+	{
+		$result = array();
+		foreach (explode(',', $value) as $part) {
+			if (trim($part) !== '') {
+				$result[] = trim($part);
+			}
+		}
+		return $result;
+	}
+
+	/**
 	 * Configuration of the fake.
 	 *
 	 * @return	array<string,mixed>
@@ -267,7 +284,7 @@ class MeliFakeRouter
 	 * A table of the state: rows by id.
 	 *
 	 * @param	string	$name	Table
-	 * @return	array<string,Row>
+	 * @return	array<string,FakeRow>
 	 */
 	private function table($name)
 	{
@@ -283,7 +300,7 @@ class MeliFakeRouter
 	 *
 	 * @param	string		$name	Table
 	 * @param	string		$id		Id
-	 * @return	Row|null
+	 * @return	FakeRow|null
 	 */
 	private function row($name, $id)
 	{
@@ -296,7 +313,7 @@ class MeliFakeRouter
 	 *
 	 * @param	string	$name	Table
 	 * @param	string	$id		Id
-	 * @param	Row		$row	Row
+	 * @param	FakeRow		$row	FakeRow
 	 * @return	void
 	 */
 	private function put($name, $id, array $row)
@@ -321,7 +338,7 @@ class MeliFakeRouter
 	/**
 	 * Random lower-case hexadecimal string.
 	 *
-	 * @param	int		$bytes	Random bytes
+	 * @param	int<1,max>	$bytes	Random bytes
 	 * @return	string
 	 */
 	private static function hex($bytes)
@@ -374,7 +391,7 @@ class MeliFakeRouter
 	 * @param	string					$type		Content type
 	 * @param	string					$body		Body
 	 * @param	array<string,string>	$headers	Extra headers
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private static function reply($status, $type, $body, array $headers = array())
 	{
@@ -388,11 +405,11 @@ class MeliFakeRouter
 	 * @param	int						$status		HTTP status
 	 * @param	mixed					$data		Data
 	 * @param	array<string,string>	$headers	Extra headers
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private static function json($status, $data, array $headers = array())
 	{
-		return self::reply($status, 'application/json;charset=UTF-8', (string) json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), $headers);
+		return self::reply($status, 'application/json;charset=UTF-8', (string) json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION), $headers);
 	}
 
 	/**
@@ -402,7 +419,7 @@ class MeliFakeRouter
 	 * @param	string		$error		Error code
 	 * @param	string		$message	Message
 	 * @param	list<mixed>	$cause		Causes
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private static function error($status, $error, $message, array $cause = array())
 	{
@@ -424,8 +441,8 @@ class MeliFakeRouter
 	/**
 	 * Copy of a row without the fake's internal keys (those starting with an underscore).
 	 *
-	 * @param	Row		$row	Row
-	 * @return	Row
+	 * @param	FakeRow		$row	FakeRow
+	 * @return	FakeRow
 	 */
 	private static function visible(array $row)
 	{
@@ -449,7 +466,7 @@ class MeliFakeRouter
 	 * @param	array<string,string>	$query		Query string parameters
 	 * @param	array<string,string>	$headers	Request headers, names in lower case
 	 * @param	string					$rawbody	Body
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	public function handle($method, $path, array $query, array $headers, $rawbody)
 	{
@@ -511,7 +528,7 @@ class MeliFakeRouter
 	 *
 	 * @param	string				$mode		Injection mode, '' for none
 	 * @param	array<string,mixed>	$injection	Injection
-	 * @return	Reply|null						Null when the request must be processed
+	 * @return	FakeReply|null						Null when the request must be processed
 	 */
 	private function early($mode, array $injection)
 	{
@@ -547,9 +564,9 @@ class MeliFakeRouter
 	/**
 	 * Add a warnings array to a successful JSON object answer.
 	 *
-	 * @param	Reply				$reply		Answer
+	 * @param	FakeReply				$reply		Answer
 	 * @param	array<string,mixed>	$injection	Injection, may carry its own warnings list
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private static function addWarnings(array $reply, array $injection)
 	{
@@ -565,7 +582,7 @@ class MeliFakeRouter
 			));
 		}
 		$data['warnings'] = $warnings;
-		$reply['body'] = (string) json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+		$reply['body'] = (string) json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
 		return $reply;
 	}
 
@@ -575,7 +592,7 @@ class MeliFakeRouter
 	 * @param	string	$method		Method
 	 * @param	string	$path		Path
 	 * @param	string	$rawbody	Body
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private function route($method, $path, $rawbody)
 	{
@@ -628,7 +645,7 @@ class MeliFakeRouter
 				return $this->getPack($m[1]);
 			}
 			if (preg_match('#^/shipments/(\d+)(/costs)?$#', $path, $m)) {
-				return $this->getShipment($m[1], isset($m[2]) && $m[2] !== '');
+				return $this->getShipment($m[1], isset($m[2]));
 			}
 			if ($path === '/shipment_labels') {
 				return $this->labels();
@@ -655,7 +672,7 @@ class MeliFakeRouter
 	/**
 	 * Check the access token of the request (Authorization: Bearer only) and remember its user.
 	 *
-	 * @return	Reply|null	Null when the token is valid
+	 * @return	FakeReply|null	Null when the token is valid
 	 */
 	private function authenticate()
 	{
@@ -678,7 +695,7 @@ class MeliFakeRouter
 	/**
 	 * GET /authorization: the consent page, answered at once with a redirect back to the application.
 	 *
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private function authorize()
 	{
@@ -723,7 +740,7 @@ class MeliFakeRouter
 	 * @param	string	$error		OAuth error
 	 * @param	string	$message	Message
 	 * @param	int		$status		HTTP status
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private static function oauthError($error, $message, $status = 400)
 	{
@@ -734,7 +751,7 @@ class MeliFakeRouter
 	 * POST /oauth/token: authorization_code and refresh_token grants, parameters in a form-encoded body only.
 	 *
 	 * @param	string	$rawbody	Body
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private function token($rawbody)
 	{
@@ -765,7 +782,7 @@ class MeliFakeRouter
 	 * Exchange an authorization code.
 	 *
 	 * @param	array<string,string>	$form	Body
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private function exchangeCode(array $form)
 	{
@@ -797,7 +814,7 @@ class MeliFakeRouter
 	 * Refresh: the refresh token is single use; reusing one is answered invalid_grant and, when configured, revokes the grant.
 	 *
 	 * @param	array<string,string>	$form	Body
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private function refresh(array $form)
 	{
@@ -852,7 +869,7 @@ class MeliFakeRouter
 	 * GET /users/me and /users/{id}.
 	 *
 	 * @param	int		$id		User id
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private function getUser($id)
 	{
@@ -880,7 +897,7 @@ class MeliFakeRouter
 	 * POST /users/test_user.
 	 *
 	 * @param	string	$rawbody	Body {"site_id":"MLA"}
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private function createTestUser($rawbody)
 	{
@@ -934,8 +951,8 @@ class MeliFakeRouter
 	/**
 	 * Pause an item at quantity 0 and reactivate it when stock comes back (only when it was paused for that reason).
 	 *
-	 * @param	Row		$item	Item
-	 * @return	Row
+	 * @param	FakeRow		$item	Item
+	 * @return	FakeRow
 	 */
 	private static function autoStatus(array $item)
 	{
@@ -954,7 +971,7 @@ class MeliFakeRouter
 	/**
 	 * Total quantity of a user product over its stock locations.
 	 *
-	 * @param	Row		$up		User product
+	 * @param	FakeRow		$up		User product
 	 * @return	int
 	 */
 	private static function upTotal(array $up)
@@ -1011,7 +1028,7 @@ class MeliFakeRouter
 	 *
 	 * @param	array<string,mixed>	$body	{model: up|legacy, id?, sku?, title?, family_name?, price?, quantity?, status?,
 	 *										user_product_id?, category_id?, variations?: [{id?, sku, quantity, attribute_combinations?}]}
-	 * @return	Row
+	 * @return	FakeRow
 	 */
 	private function buildItem(array $body)
 	{
@@ -1080,7 +1097,7 @@ class MeliFakeRouter
 	 * GET /users/{id}/items/search: ids of the seller's items, with offset paging or search_type=scan.
 	 *
 	 * @param	int		$id		Seller id
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private function searchItems($id)
 	{
@@ -1125,7 +1142,7 @@ class MeliFakeRouter
 	/**
 	 * Whether an item or one of its variations carries a SELLER_SKU.
 	 *
-	 * @param	Row		$item	Item
+	 * @param	FakeRow		$item	Item
 	 * @param	string	$sku	SKU
 	 * @return	bool
 	 */
@@ -1145,11 +1162,11 @@ class MeliFakeRouter
 	/**
 	 * GET /items/bulk?ids=: at most 20 items, each as {code, body}.
 	 *
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private function bulkItems()
 	{
-		$ids = array_values(array_filter(explode(',', $this->query['ids'] ?? ''), 'strlen'));
+		$ids = self::csv($this->query['ids'] ?? '');
 		if (!count($ids)) {
 			return self::error(400, 'bad_request', 'ids is required');
 		}
@@ -1173,7 +1190,7 @@ class MeliFakeRouter
 	 *
 	 * @param	string	$id			Item id
 	 * @param	string	$rawbody	Body
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private function putItem($id, $rawbody)
 	{
@@ -1239,8 +1256,9 @@ class MeliFakeRouter
 				// ML propagates a quantity written on one item to every item of the same user product.
 				$this->setUpStock($upId, 'selling_address', $qty);
 				$item = $this->row('items', $id) ?? $item;
+			} else {
+				$item['available_quantity'] = $qty;
 			}
-			$item['available_quantity'] = $qty;
 		}
 		if (array_key_exists('price', $body)) {
 			if (!is_numeric($body['price']) || self::float($body['price']) <= 0) {
@@ -1265,8 +1283,8 @@ class MeliFakeRouter
 	/**
 	 * Stock answer of a user product.
 	 *
-	 * @param	Row		$up		User product
-	 * @return	Reply
+	 * @param	FakeRow		$up		User product
+	 * @return	FakeReply
 	 */
 	private static function stockReply(array $up)
 	{
@@ -1278,7 +1296,7 @@ class MeliFakeRouter
 	 * GET /user-products/{id}/stock.
 	 *
 	 * @param	string	$upId	User product id
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private function getStock($upId)
 	{
@@ -1298,7 +1316,7 @@ class MeliFakeRouter
 	 * @param	string	$upId		User product id
 	 * @param	string	$type		Location type
 	 * @param	string	$rawbody	Body {"quantity": n}
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private function putStock($upId, $type, $rawbody)
 	{
@@ -1335,7 +1353,7 @@ class MeliFakeRouter
 	 * GET /orders/{id}.
 	 *
 	 * @param	string	$id		Order id
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private function getOrder($id)
 	{
@@ -1353,7 +1371,7 @@ class MeliFakeRouter
 	 * GET /packs/{id}. An order without pack is served as a pack of one under its own id.
 	 *
 	 * @param	string	$id		Pack id (or order id)
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private function getPack($id)
 	{
@@ -1386,7 +1404,7 @@ class MeliFakeRouter
 	/**
 	 * GET /orders/search?seller=&order.date_last_updated.from=&order.date_last_updated.to=&offset=&limit=.
 	 *
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private function searchOrders()
 	{
@@ -1430,8 +1448,8 @@ class MeliFakeRouter
 	/**
 	 * Comparison of two entries by their first element, then by the order id.
 	 *
-	 * @param	array{0:int,1:Row}	$a	Entry
-	 * @param	array{0:int,1:Row}	$b	Entry
+	 * @param	array{0:int,1:FakeRow}	$a	Entry
+	 * @param	array{0:int,1:FakeRow}	$b	Entry
 	 * @return	int
 	 */
 	public static function compareFirst(array $a, array $b)
@@ -1444,7 +1462,7 @@ class MeliFakeRouter
 	 *
 	 * @param	string	$site	Site
 	 * @param	string	$id		Billing info id
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private function billingInfo($site, $id)
 	{
@@ -1510,7 +1528,7 @@ class MeliFakeRouter
 	 * POST /__test/order: a sale (one order per line, a pack when there are several lines), with buyer, billing info and shipment.
 	 *
 	 * @param	array<string,mixed>	$body	Request (see README.md)
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private function seedOrder(array $body)
 	{
@@ -1537,7 +1555,8 @@ class MeliFakeRouter
 
 		$shipmentId = null;
 		$receiverCost = 0.0;
-		if (($body['shipment'] ?? array()) !== false && ($body['shipment'] ?? array()) !== null) {
+		$shipmentSpec = array_key_exists('shipment', $body) ? $body['shipment'] : array();
+		if ($shipmentSpec !== false && $shipmentSpec !== null) {
 			$shipmentId = 40000000000 + $this->nextId();
 			$spec = self::map($body['shipment'] ?? null);
 			$receiverCost = self::float($spec['receiver_cost'] ?? 0);
@@ -1625,7 +1644,7 @@ class MeliFakeRouter
 	 * @param	string				$id			Billing info id
 	 * @param	int					$buyerId	Buyer
 	 * @param	array<string,mixed>	$spec		{name, last_name, doc_type, doc_number, taxpayer_type, address{...}}
-	 * @return	Row
+	 * @return	FakeRow
 	 */
 	private function buildBilling($id, $buyerId, array $spec)
 	{
@@ -1650,7 +1669,7 @@ class MeliFakeRouter
 	 * @param	list<int>			$orderIds	Orders shipped
 	 * @param	array<string,mixed>	$spec		{status, substatus, logistic_type, mode, receiver_cost, sender_cost, address{...}}
 	 * @param	int					$created	Creation time
-	 * @return	Row
+	 * @return	FakeRow
 	 */
 	private function buildShipment($id, $buyerId, array $orderIds, array $spec, $created)
 	{
@@ -1681,7 +1700,7 @@ class MeliFakeRouter
 	 *
 	 * @param	string	$id		Shipment id
 	 * @param	bool	$costs	Costs sub-resource
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private function getShipment($id, $costs)
 	{
@@ -1725,11 +1744,11 @@ class MeliFakeRouter
 	/**
 	 * GET /shipment_labels?shipment_ids=a,b&response_type=pdf|zpl2.
 	 *
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private function labels()
 	{
-		$ids = array_values(array_unique(array_filter(array_map('trim', explode(',', $this->query['shipment_ids'] ?? '')), 'strlen')));
+		$ids = array_values(array_unique(self::csv($this->query['shipment_ids'] ?? '')));
 		$format = $this->query['response_type'] ?? 'pdf';
 		if (!count($ids)) {
 			return self::error(400, 'bad_request', 'shipment_ids is required');
@@ -1842,7 +1861,8 @@ class MeliFakeRouter
 			'application_id' => self::int($this->cfg('app_id')), 'attempts' => $attempts,
 			'sent' => self::isoUtc($now), 'received' => self::isoUtc($now),
 		), JSON_UNESCAPED_SLASHES);
-		for ($copy = 0; $copy < max(1, $copies); $copy++) {
+		$copies = max(1, $copies);
+		for ($copy = 0; $copy < $copies; $copy++) {
 			$this->deliveries[] = array(
 				'url' => self::str($this->cfg('webhook_url')), 'body' => $body,
 				'delay_ms' => $copy === 0 ? max(0, $delayMs) : 0, 'timeout_ms' => max(1, self::int($this->cfg('webhook_timeout_ms'))),
@@ -1853,8 +1873,8 @@ class MeliFakeRouter
 	/**
 	 * POST the queued notifications to the webhook and time each answer. Runs without the state lock.
 	 *
-	 * @param	list<Delivery>	$deliveries		Notifications
-	 * @return	list<DeliveryResult>
+	 * @param	list<FakeDelivery>	$deliveries		Notifications
+	 * @return	list<FakeDeliveryResult>
 	 */
 	public static function deliver(array $deliveries)
 	{
@@ -1887,9 +1907,9 @@ class MeliFakeRouter
 	 * Record the outcome of the deliveries (a delivery not answered 200 within webhook_max_ms goes to missed_feeds) and
 	 * complete the answer of the control call that sent them.
 	 *
-	 * @param	list<DeliveryResult>	$results	Outcomes
-	 * @param	Reply					$reply		Answer of the control call
-	 * @return	Reply
+	 * @param	list<FakeDeliveryResult>	$results	Outcomes
+	 * @param	FakeReply					$reply		Answer of the control call
+	 * @return	FakeReply
 	 */
 	public function recordDeliveries(array $results, array $reply)
 	{
@@ -1915,7 +1935,7 @@ class MeliFakeRouter
 			$data['duration_ms'] = $summary[0]['duration_ms'];
 			$data['missed'] = $summary[0]['missed'];
 		}
-		$reply['body'] = (string) json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+		$reply['body'] = (string) json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
 		$reply['deliveries'] = array();
 		return $reply;
 	}
@@ -1923,7 +1943,7 @@ class MeliFakeRouter
 	/**
 	 * GET /missed_feeds?app_id=&topic=&offset=&limit=: notifications not answered 200 in time, kept two days.
 	 *
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private function missedFeeds()
 	{
@@ -1964,7 +1984,7 @@ class MeliFakeRouter
 	 * @param	string	$method		HTTP method
 	 * @param	string	$path		Path
 	 * @param	string	$rawbody	JSON body
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private function control($method, $path, $rawbody)
 	{
@@ -2049,7 +2069,7 @@ class MeliFakeRouter
 	 * POST /__test/stock: change stock on Mercado Libre's side (a sale or an edit made in ML's UI).
 	 *
 	 * @param	array<string,mixed>	$body	{user_product_id, quantity, type?} or {item_id, variation_id?, quantity}
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private function controlStock(array $body)
 	{
@@ -2088,7 +2108,7 @@ class MeliFakeRouter
 	 * POST /__test/shipment: set status and substatus of a shipment.
 	 *
 	 * @param	array<string,mixed>	$body	{id, status, substatus, logistic_type?, notify?}
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private function controlShipment(array $body)
 	{
@@ -2124,7 +2144,7 @@ class MeliFakeRouter
 	 *
 	 * @param	bool				$fraud	Flag fraud instead of cancelling
 	 * @param	array<string,mixed>	$body	{order_id, requested_by?, code?, description?, notify?}
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private function controlOrder($fraud, array $body)
 	{
@@ -2170,7 +2190,7 @@ class MeliFakeRouter
 	 * per variation for a legacy item with variations), and an items notification is sent for each of them.
 	 *
 	 * @param	array<string,mixed>	$body	{item_id, new_ids?: [..]}
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private function changeItemId(array $body)
 	{
@@ -2215,7 +2235,7 @@ class MeliFakeRouter
 	 * POST /__test/inject: queue one-shot faults.
 	 *
 	 * @param	array<string,mixed>	$body	{mode, method?, path?, ...} or {injections: [...]}
-	 * @return	Reply
+	 * @return	FakeReply
 	 */
 	private function controlInject(array $body)
 	{
@@ -2240,7 +2260,7 @@ class MeliFakeRouter
 	/**
 	 * Send an answer, honouring the delay and drop of an injection.
 	 *
-	 * @param	Reply	$reply	Answer
+	 * @param	FakeReply	$reply	Answer
 	 * @return	void
 	 */
 	public static function send(array $reply)
@@ -2263,20 +2283,18 @@ class MeliFakeRouter
 
 
 /**
- * Read the state file, run one request against it and write it back, under an exclusive lock.
+ * Open and lock the state file and load a router on its content.
  *
- * @param	string			$file		State file
- * @param	MeliFakeRouter	$router		Router whose state is replaced by the file's (null to create one)
- * @return	resource|false				Locked handle, false when the file cannot be used
+ * @param	string	$file	State file
+ * @return	array{0:resource,1:MeliFakeRouter}|null		Locked handle and router, null when the file cannot be used
  */
-function meliFakeLock($file, &$router)
+function meliFakeLock($file)
 {
 	$handle = fopen($file, 'c+');
 	if ($handle === false || !flock($handle, LOCK_EX)) {
-		return false;
+		return null;
 	}
-	$router = new MeliFakeRouter(MeliFakeRouter::map(json_decode((string) stream_get_contents($handle), true)));
-	return $handle;
+	return array($handle, new MeliFakeRouter(MeliFakeRouter::map(json_decode((string) stream_get_contents($handle), true))));
 }
 
 /**
@@ -2290,7 +2308,7 @@ function meliFakeUnlock($handle, MeliFakeRouter $router)
 {
 	ftruncate($handle, 0);
 	rewind($handle);
-	fwrite($handle, (string) json_encode($router->getState(), JSON_UNESCAPED_SLASHES));
+	fwrite($handle, (string) json_encode($router->getState(), JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION));
 	fflush($handle);
 	flock($handle, LOCK_UN);
 	fclose($handle);
@@ -2323,13 +2341,13 @@ $melifakebody = (string) file_get_contents('php://input');
 
 // One request at a time: read, change and write the state under an exclusive lock, released before any injected delay
 // and before notifications are POSTed, so that other requests (the test's control calls, the webhook's own calls) go on.
-$melifakerouter = null;
-$melifakehandle = meliFakeLock($melifakefile, $melifakerouter);
-if ($melifakehandle === false || !($melifakerouter instanceof MeliFakeRouter)) {
+$melifakelock = meliFakeLock($melifakefile);
+if ($melifakelock === null) {
 	http_response_code(500);
 	print 'state file not usable';
 	return true;
 }
+list($melifakehandle, $melifakerouter) = $melifakelock;
 $melifakereply = $melifakerouter->handle(
 	MeliFakeRouter::str($_SERVER['REQUEST_METHOD'] ?? 'GET'),
 	MeliFakeRouter::str(parse_url($melifakeuri, PHP_URL_PATH)),
@@ -2341,10 +2359,10 @@ meliFakeUnlock($melifakehandle, $melifakerouter);
 
 if (count($melifakereply['deliveries'])) {
 	$melifakeresults = MeliFakeRouter::deliver($melifakereply['deliveries']);
-	$melifakehandle = meliFakeLock($melifakefile, $melifakerouter);
-	if ($melifakehandle !== false && $melifakerouter instanceof MeliFakeRouter) {
-		$melifakereply = $melifakerouter->recordDeliveries($melifakeresults, $melifakereply);
-		meliFakeUnlock($melifakehandle, $melifakerouter);
+	$melifakelock = meliFakeLock($melifakefile);
+	if ($melifakelock !== null) {
+		$melifakereply = $melifakelock[1]->recordDeliveries($melifakeresults, $melifakereply);
+		meliFakeUnlock($melifakelock[0], $melifakelock[1]);
 	}
 }
 
