@@ -43,7 +43,7 @@ class MeliFakeRouter
 	/**
 	 * @var list<string> Injection modes
 	 */
-	const MODES = array('http_429', 'http_500', 'http_503', 'timeout_before', 'timeout_after', 'drop_after', 'forbidden_policies', 'warnings');
+	const MODES = array('http_429', 'http_500', 'http_503', 'timeout_before', 'timeout_after', 'drop_after', 'forbidden_policies', 'warnings', 'bump_version_after');
 
 	/**
 	 * @var list<string> Item statuses accepted by PUT /items/{id}
@@ -490,6 +490,8 @@ class MeliFakeRouter
 				$reply['drop'] = true;
 			} elseif ($mode === 'warnings') {
 				$reply = self::addWarnings($reply, $injection ?? array());
+			} elseif ($mode === 'bump_version_after') {
+				$this->bumpAfter($path, $injection ?? array());
 			}
 		}
 		$this->log['status'] = $reply['status'];
@@ -521,6 +523,41 @@ class MeliFakeRouter
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * After answering a request about a user product, change it as a sale on Mercado Libre's side
+	 * would: its version goes up (and, with "sell", its selling_address quantity goes down). The
+	 * client's next write with the version it just read is then refused with 409.
+	 *
+	 * @param	string				$path		Path of the request, /user-products/{id}/...
+	 * @param	array<string,mixed>	$injection	Injection, with optional "sell" (units)
+	 * @return	void
+	 */
+	private function bumpAfter($path, array $injection)
+	{
+		if (!preg_match('#^/user-products/([^/]+)#', $path, $match)) {
+			return;
+		}
+		$up = $this->row('user_products', $match[1]);
+		if ($up === null) {
+			return;
+		}
+		$sell = max(0, self::int($injection['sell'] ?? 0));
+		if ($sell > 0) {
+			$selling = 0;
+			foreach (self::lst($up['locations'] ?? null) as $location) {
+				$location = self::map($location);
+				if (self::str($location['type'] ?? '') === 'selling_address') {
+					$selling = self::int($location['quantity'] ?? 0);
+				}
+			}
+			// setUpStock() raises the version too.
+			$this->setUpStock($match[1], 'selling_address', max(0, $selling - $sell));
+			return;
+		}
+		$up['version'] = self::int($up['version'] ?? 0) + 1;
+		$this->put('user_products', $match[1], $up);
 	}
 
 	/**

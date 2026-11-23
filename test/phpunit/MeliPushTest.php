@@ -85,6 +85,42 @@ class MeliPushTest extends MeliFakeTestCase
 	}
 
 	/**
+	 * A sale on Mercado Libre between our read of the stock and our write: the write is refused
+	 * (409), the stock read again with its new version, and written then.
+	 *
+	 * @return	void
+	 */
+	public function testVersionConflictRereads()
+	{
+		/** @var DoliDB $db */
+		global $db;
+
+		$product = $this->fixtures->product();
+		$item = $this->fake()->seedItem(array('model' => 'up', 'sku' => $product->ref, 'quantity' => 9));
+		$upId = meli_test_str($item['user_product_id'] ?? '');
+		(new MeliLink($db))->sync();
+		$this->fixtures->stock($product, $this->warehouse, 4);
+		$this->fake()->inject(array('mode' => 'bump_version_after', 'method' => 'GET', 'path' => '/user-products/'.$upId.'/stock', 'sell' => 1));
+
+		$counts = (new MeliStock($db))->push(null, 1000);
+		$this->assertSame(1, $counts['pushed']);
+		$calls = array_values(array_filter($this->calls(), function ($call) {
+			return strpos($call, '/user-products/') !== false;
+		}));
+		$get = 'GET /user-products/'.$upId.'/stock';
+		$put = 'PUT /user-products/'.$upId.'/stock/type/selling_address';
+		$this->assertSame(array($get, $put, $get, $put), $calls);
+		$statuses = array();
+		foreach ($this->fake()->log() as $entry) {
+			if (meli_test_str($entry['method'] ?? '').' '.meli_test_str($entry['path'] ?? '') === $put) {
+				$statuses[] = meli_test_str($entry['status'] ?? '');
+			}
+		}
+		$this->assertSame(array('409', '200'), $statuses);
+		$this->assertSame(4, $this->upStock($upId)['quantity'], 'Dolibarr\'s quantity written with the new version');
+	}
+
+	/**
 	 * A legacy variation gets its quantity through the item; the same value is not sent again the same day.
 	 *
 	 * @return	void

@@ -41,6 +41,7 @@ require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
 require_once DOL_DOCUMENT_ROOT.'/product/stock/class/entrepot.class.php';
 require_once DOL_DOCUMENT_ROOT.'/commande/class/commande.class.php';
 require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
+require_once DOL_DOCUMENT_ROOT.'/compta/bank/class/account.class.php';
 require_once dirname(__DIR__, 2).'/class/meliinbox.class.php';
 require_once dirname(__DIR__, 2).'/class/melicron.class.php';
 require_once dirname(__DIR__, 2).'/core/modules/modMeli.class.php';
@@ -151,7 +152,7 @@ class MeliFixtures
 	/**
 	 * @var array<string, list<int>>	Ids created, by kind
 	 */
-	private $ids = array('product' => array(), 'warehouse' => array(), 'thirdparty' => array(), 'order' => array(), 'invoice' => array());
+	private $ids = array('product' => array(), 'warehouse' => array(), 'thirdparty' => array(), 'order' => array(), 'invoice' => array(), 'bank' => array());
 
 	/**
 	 * Constructor
@@ -239,6 +240,37 @@ class MeliFixtures
 		if ($product->correct_stock($user, $warehouse, abs($qty), $qty < 0 ? 1 : 0, 'meli test') <= 0) {
 			throw new RuntimeException('stock: '.$product->error);
 		}
+	}
+
+	/**
+	 * A bank account of this run.
+	 *
+	 * @return	int		Id
+	 */
+	public function bankAccount()
+	{
+		/**
+		 * @var DoliDB $db
+		 * @var User $user
+		 */
+		global $db, $user;
+
+		$account = new Account($db);
+		$account->ref = 'MT'.substr($this->tag, -6).'B'.(count($this->ids['bank']) + 1);
+		$account->label = $this->tag.' bank';
+		$account->type = Account::TYPE_CURRENT;
+		$account->courant = Account::TYPE_CURRENT;
+		$account->currency_code = 'ARS';
+		$account->country_id = (int) dol_getIdFromCode($db, 'AR', 'c_country', 'code', 'rowid');
+		$account->date_solde = dol_now();
+		$account->balance = 0;
+		$id = (int) $account->create($user);
+		if ($id <= 0) {
+			throw new RuntimeException('bank account: '.$account->error);
+		}
+		$this->ids['bank'][] = $id;
+
+		return $id;
 	}
 
 	/**
@@ -404,6 +436,17 @@ class MeliFixtures
 				}
 			}
 		}
+		foreach (array_reverse($this->ids['bank']) as $id) {
+			$account = new Account($db);
+			if ($account->fetch($id) > 0 && (string) $account->label === $this->tag.' bank') {
+				// Lines left by payments of this run's invoices (deleted above with their payments).
+				$db->query("DELETE FROM ".$prefix."bank_url WHERE fk_bank IN (SELECT b.rowid FROM ".$prefix."bank as b WHERE b.fk_account = ".((int) $id).")");
+				$db->query("DELETE FROM ".$prefix."bank WHERE fk_account = ".((int) $id));
+				if ($account->delete($user) <= 0) {
+					$failed[] = 'bank account '.$id;
+				}
+			}
+		}
 		foreach (array_reverse($this->ids['warehouse']) as $id) {
 			$warehouse = new Entrepot($db);
 			if ($warehouse->fetch($id) > 0 && strpos((string) $warehouse->ref, $this->tag) === 0) {
@@ -412,7 +455,7 @@ class MeliFixtures
 				}
 			}
 		}
-		$this->ids = array('product' => array(), 'warehouse' => array(), 'thirdparty' => array(), 'order' => array(), 'invoice' => array());
+		$this->ids = array('product' => array(), 'warehouse' => array(), 'thirdparty' => array(), 'order' => array(), 'invoice' => array(), 'bank' => array());
 		if (!empty($failed)) {
 			// Loud on purpose: a leftover must be seen and removed by hand, not pile up.
 			throw new RuntimeException('test records left behind ('.$this->tag.'): '.implode(', ', $failed));
@@ -450,6 +493,11 @@ abstract class MeliTestCase extends PHPUnit\Framework\TestCase
 	private $savedGlobals = array();
 
 	/**
+	 * @var MeliLock|null	Lease that keeps two runs of these tests on one database apart
+	 */
+	private $suiteLock;
+
+	/**
 	 * Enable the module once and keep the settings.
 	 *
 	 * @return	void
@@ -457,6 +505,8 @@ abstract class MeliTestCase extends PHPUnit\Framework\TestCase
 	protected function setUp(): void
 	{
 		parent::setUp();
+		// First: tearDown() runs even when the rest of setUp() fails.
+		$this->fixtures = new MeliFixtures();
 		if (!is_file(dol_buildpath('/meli/core/modules/modMeli.class.php', 0))) {
 			// Activation would then create no table, and every test would fail for that reason.
 			$this->fail('module meli is not linked into this instance (htdocs/custom/meli): run dev/up.sh');
@@ -467,10 +517,22 @@ abstract class MeliTestCase extends PHPUnit\Framework\TestCase
 				$this->fail('module activation: '.implode(' ', $result['errors']));
 			}
 		}
+		/** @var DoliDB $db */
+		global $db;
+		// The tests share one account row per entity and sweep the link table: a second run on the
+		// same database (another pane's gate) waits until this test is over.
+		$this->suiteLock = new MeliLock($db);
+		$waited = 0;
+		while (!$this->suiteLock->acquire('test:meli-suite', 300)) {
+			if ($waited >= 600) {
+				$this->fail('another run of the meli tests holds this database for more than 10 minutes');
+			}
+			sleep(1);
+			$waited++;
+		}
 		foreach (MELI_TEST_CONSTANTS as $name) {
 			$this->savedGlobals[$name] = meli_test_get_global($name);
 		}
-		$this->fixtures = new MeliFixtures();
 	}
 
 	/**
@@ -480,9 +542,16 @@ abstract class MeliTestCase extends PHPUnit\Framework\TestCase
 	 */
 	protected function tearDown(): void
 	{
-		$this->fixtures->cleanup();
-		foreach ($this->savedGlobals as $name => $value) {
-			meli_test_set_global($name, $value);
+		try {
+			$this->fixtures->cleanup();
+		} finally {
+			foreach ($this->savedGlobals as $name => $value) {
+				meli_test_set_global($name, $value);
+			}
+			if ($this->suiteLock !== null) {
+				$this->suiteLock->release('test:meli-suite');
+				$this->suiteLock = null;
+			}
 		}
 		parent::tearDown();
 	}

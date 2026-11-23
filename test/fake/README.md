@@ -126,6 +126,7 @@ path starts with `path` (default `*`). Control calls are never matched.
 | `drop_after` | yes | Headers announcing a longer body than sent; curl reports error 18. |
 | `forbidden_policies` | no | 403 `{"message":"At least one policy returned UNAUTHORIZED.","error":"PA_UNAUTHORIZED_RESULT_FROM_POLICIES",…}` (R§1.2, missing functional permission). |
 | `warnings` `{warnings?}` | yes | The normal answer, plus a `warnings` array when it is a 2xx JSON object (R§3.2). |
+| `bump_version_after` `{sell?}` | yes | The normal answer; then the user product of the path (`/user-products/{id}/...`) changes as after a sale on ML's side: its version goes up, and with `sell` its `selling_address` quantity goes down by that many. A write with the version just read gets 409. |
 
 Scenarios that are control calls rather than injections: token revoked mid-run (`revoke`),
 UPtin id change (`change_item_id`), cancellation or fraud after import (`cancel_order`,
