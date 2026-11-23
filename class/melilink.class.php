@@ -285,12 +285,12 @@ class MeliLink
 
 		// Listings no longer returned were closed, or replaced when Mercado Libre moved them to User
 		// Products (the replacement came back with the same SKU and was linked above).
-		$sql = "UPDATE ".$table." SET active = 0 WHERE entity = ".((int) $conf->entity)." AND active = 1";
-		if (!empty($seen)) {
-			$sql .= " AND rowid NOT IN (".implode(',', $seen).")";
-		}
-		$resql = $this->db->query($sql);
-		$counts['gone'] = ($resql && $resql !== true) ? (int) $this->db->affected_rows($resql) : 0;
+		$where = " WHERE entity = ".((int) $conf->entity)." AND active = 1".(empty($seen) ? '' : " AND rowid NOT IN (".implode(',', $seen).")");
+		// Counted before: drivers report the rows an UPDATE changed differently.
+		$resql = $this->db->query("SELECT COUNT(rowid) as nb FROM ".$table.$where);
+		$row = ($resql && $resql !== true) ? $this->db->fetch_array($resql) : null;
+		$counts['gone'] = is_array($row) ? self::int($row['nb']) : 0;
+		$this->db->query("UPDATE ".$table." SET active = 0".$where);
 
 		return $counts;
 	}

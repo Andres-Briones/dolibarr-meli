@@ -160,13 +160,14 @@ class MeliStock
 			if ($id <= 0) {
 				continue;
 			}
-			// One row per product: an existing row is made due now instead of adding another.
-			$sql = "UPDATE ".$table." SET date_due = ".$now.", reason = '".$this->db->escape($reason)."' WHERE entity = ".((int) $conf->entity)." AND fk_product = ".$id;
-			$resql = $this->db->query($sql, 1);
-			if ($resql && $resql !== true && $this->db->affected_rows($resql) > 0) {
-				continue;
+			// One row per product: an existing row is made due now instead of adding another. When
+			// two processes insert at once, the unique key refuses the second, whose update then applies.
+			$update = "UPDATE ".$table." SET date_due = ".$now.", reason = '".$this->db->escape($reason)."' WHERE entity = ".((int) $conf->entity)." AND fk_product = ".$id;
+			$resql = $this->db->query("SELECT rowid FROM ".$table." WHERE entity = ".((int) $conf->entity)." AND fk_product = ".$id);
+			$exists = ($resql && $resql !== true && is_array($this->db->fetch_array($resql)));
+			if ($exists || !$this->db->query("INSERT INTO ".$table." (entity, fk_product, reason, date_due) VALUES (".((int) $conf->entity).", ".$id.", '".$this->db->escape($reason)."', ".$now.")", 1)) {
+				$this->db->query($update, 1);
 			}
-			$this->db->query("INSERT INTO ".$table." (entity, fk_product, reason, date_due) VALUES (".((int) $conf->entity).", ".$id.", '".$this->db->escape($reason)."', ".$now.")", 1);
 		}
 	}
 
