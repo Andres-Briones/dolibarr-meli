@@ -169,7 +169,8 @@ $line = function (string $label, string $field, string $help = '') use ($langs):
 };
 $line('MeliAppId', '<input type="text" name="MELI_APP_ID" class="minwidth200" value="'.dol_escape_htmltag(MeliConfig::appId()).'">', 'MeliAppIdHelp');
 $line('MeliAppSecret', '<input type="password" name="MELI_APP_SECRET" class="minwidth200" autocomplete="new-password" value="" placeholder="'.dol_escape_htmltag(MeliConfig::appSecret() !== '' ? $langs->trans('MeliSecretStored') : '').'">', 'MeliAppSecretHelp');
-$users = $form->select_dolusers(getDolGlobalInt('MELI_USER_ID'), 'MELI_USER_ID', 1);
+// -1: core would otherwise preselect the administrator viewing the page.
+$users = $form->select_dolusers(getDolGlobalInt('MELI_USER_ID') > 0 ? getDolGlobalInt('MELI_USER_ID') : -1, 'MELI_USER_ID', 1);
 $line('MeliTechnicalUser', is_string($users) ? $users : '', 'MeliTechnicalUserHelp');
 $line('MeliWarehouses', Form::multiselectarray('MELI_WAREHOUSE_IDS', $warehouses, explode(',', getDolGlobalString('MELI_WAREHOUSE_IDS')), 0, 0, 'minwidth300'), 'MeliWarehousesHelp');
 $line('MeliBuffer', '<input type="number" min="0" name="MELI_BUFFER" class="width75" value="'.getDolGlobalInt('MELI_BUFFER').'">', 'MeliBufferHelp');
