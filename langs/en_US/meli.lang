@@ -1,0 +1,11 @@
+# Translation file of module Meli - en_US
+
+# Module
+ModuleMeliName=Mercado Libre
+ModuleMeliDesc=Links your Mercado Libre listings to your products: stock, sales, shipping and labels
+MeliDescription=Links your Mercado Libre listings to your products: stock, sales, shipping and labels
+
+# Connection
+MeliConnected=The Mercado Libre account is connected.
+MeliConnectRefused=Mercado Libre did not authorise the connection (%s).
+MeliConnectFailed=The account could not be connected: %s

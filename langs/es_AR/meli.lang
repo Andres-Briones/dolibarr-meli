@@ -1,0 +1,11 @@
+# Translation file of module Meli - es_AR
+
+# Module
+ModuleMeliName=Mercado Libre
+ModuleMeliDesc=Vincula tus publicaciones de Mercado Libre con tus productos: stock, ventas, envíos y etiquetas
+MeliDescription=Vincula tus publicaciones de Mercado Libre con tus productos: stock, ventas, envíos y etiquetas
+
+# Connection
+MeliConnected=La cuenta de Mercado Libre quedó conectada.
+MeliConnectRefused=Mercado Libre no autorizó la conexión (%s).
+MeliConnectFailed=No se pudo conectar la cuenta: %s
