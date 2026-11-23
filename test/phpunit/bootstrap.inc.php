@@ -457,6 +457,10 @@ abstract class MeliTestCase extends PHPUnit\Framework\TestCase
 	protected function setUp(): void
 	{
 		parent::setUp();
+		if (!is_file(dol_buildpath('/meli/core/modules/modMeli.class.php', 0))) {
+			// Activation would then create no table, and every test would fail for that reason.
+			$this->fail('module meli is not linked into this instance (htdocs/custom/meli): run dev/up.sh');
+		}
 		if (!isModEnabled('meli')) {
 			$result = activateModule('modMeli');
 			if (!empty($result['errors'])) {
