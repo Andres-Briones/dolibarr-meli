@@ -5,7 +5,7 @@
 #
 # Usage: DOLI_SRC=/path/to/dolibarr RUN=/path/to/runtime [HTTP_PORT=…] dolibarr-meli/test/http/setup.sh
 #   The module must be linked in htdocs/custom of that instance, enabled, and its web server running.
-#   SHOTS=<dir>  where the screenshots go (default: a temporary directory).
+#   SHOTS=<dir>  where the screenshots go (default: a new temporary directory, kept and printed).
 # Leaves nothing behind: settings are put back as found, the account and fixtures removed. Refuses
 # to run when an account is connected on the instance.
 set -euo pipefail
@@ -18,7 +18,8 @@ DEV="${DEV:-$(dirname "$MODULE")/dev}"
 export DOLI_SRC RUN DEV
 
 WORK="$(mktemp -d)"
-SHOTS="${SHOTS:-$WORK/shots}"
+# Outside WORK, which is removed at the end: the screenshots stay to be looked at.
+SHOTS="${SHOTS:-$(mktemp -d "${TMPDIR:-/tmp}/meli-shots.XXXXXX")}"
 mkdir -p "$SHOTS"
 FAKE_PID=""
 PORT=""

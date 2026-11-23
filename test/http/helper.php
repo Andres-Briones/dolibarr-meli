@@ -23,6 +23,11 @@
  * Usage: php helper.php setup <fake url> <work dir>   prints JSON {tag, refs, redirect}
  *        php helper.php secret                        prints "encrypted" when the stored secret is not plain
  *        php helper.php teardown <work dir>     <work dir>/items lists the fake's item ids
+ *        php helper.php chain <fake url> <work dir>   setup, then: account connected, warehouse with stock,
+ *                                                   bank account, invoicing and push on; prints JSON {tag, ref, document, buyer}
+ *        php helper.php cron <queue|polling|nightly>  run one scheduled job; prints its output
+ *        php helper.php inbox                         notifications waiting
+ *        php helper.php sale <ML order id>            JSON of the imported sale, its order, invoice and payment
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -75,6 +80,71 @@ if ($command === 'setup') {
 	exit(0);
 }
 
+if ($command === 'chain') {
+	$fake = (string) ($argv[2] ?? '');
+	$work = (string) ($argv[3] ?? '');
+	$fixtures = new MeliFixtures();
+	$fixtures->takeOver(trim((string) file_get_contents($work.'/tag')));
+	$refs = array();
+	foreach ($fixtures->ids('product') as $id) {
+		$product = new Product($db);
+		$product->fetch($id);
+		$refs[] = (string) $product->ref;
+	}
+	$warehouse = $fixtures->warehouse();
+	$bank = $fixtures->bankAccount();
+	$product = new Product($db);
+	$product->fetch($fixtures->ids('product')[0]);
+	$fixtures->stock($product, $warehouse, 5);
+	$settings = array(
+		'MELI_APP_ID' => MeliFakeTestCase::APP_ID, 'MELI_APP_SECRET' => dolEncrypt(MeliFakeTestCase::APP_SECRET), 'MELI_WAREHOUSE_IDS' => (string) $warehouse,
+		'MELI_USER_ID' => (string) $user->id, 'MELI_BANK_ACCOUNT' => (string) $bank, 'MELI_INVOICE_ORDERS' => '1', 'MELI_PUSH_STOCK' => '1', 'MELI_BUFFER' => '0',
+	);
+	foreach ($settings as $name => $value) {
+		dolibarr_set_const($db, $name, $value, 'chaine', 0, '', $conf->entity);
+	}
+	// The administrator's authorisation, as the setup page does it, through the fake's redirect.
+	$account = new MeliAccount($db);
+	$url = $account->authorizationUrl($user);
+	$client = new MeliFakeClient($fake);
+	$back = MeliFakeClient::redirectParams($client->request('GET', substr($url, strlen($fake))));
+	if (!$account->finishAuthorization($user, $back['state'] ?? '', $back['code'] ?? '')) {
+		fwrite(STDERR, 'authorisation: '.$account->message."\n");
+		exit(1);
+	}
+	print json_encode(array('tag' => $fixtures->tag, 'ref' => $refs[0], 'document' => (string) (40000000 + crc32($fixtures->tag) % 50000000), 'buyer' => 900000000 + crc32($fixtures->tag) % 99999999))."\n";
+	exit(0);
+}
+
+if ($command === 'cron') {
+	$job = (string) ($argv[2] ?? '');
+	$cron = new MeliCron($db);
+	$methods = array('queue' => 'runQueue', 'polling' => 'runPolling', 'nightly' => 'runNightly');
+	if (!isset($methods[$job])) {
+		exit(1);
+	}
+	$result = call_user_func(array($cron, $methods[$job]));
+	print $cron->output.($cron->error !== '' ? ' ERROR '.$cron->error : '')."\n";
+	exit($result === 0 ? 0 : 1);
+}
+
+if ($command === 'inbox') {
+	$rows = meli_test_rows("SELECT COUNT(i.rowid) as nb FROM ".$db->prefix()."meli_inbox as i WHERE i.entity = ".((int) $conf->entity)." AND i.status = 'new'");
+	print $rows[0]['nb']."\n";
+	exit(0);
+}
+
+if ($command === 'sale') {
+	$id = preg_replace('/\D/', '', (string) ($argv[2] ?? ''));
+	$sql = "SELECT o.pack_id, o.fk_commande, o.fk_facture, o.oversold, o.needs_review, o.shipment_status, c.fk_statut as order_status, c.module_source, f.ref as invoice_ref, f.fk_statut as invoice_status, f.total_ttc,";
+	$sql .= " (SELECT SUM(p.amount) FROM ".$db->prefix()."paiement_facture as pf JOIN ".$db->prefix()."paiement as p ON p.rowid = pf.fk_paiement JOIN ".$db->prefix()."c_paiement as cp ON cp.id = p.fk_paiement AND cp.code = 'MELI' WHERE pf.fk_facture = o.fk_facture) as paid_meli";
+	$sql .= " FROM ".$db->prefix()."meli_order as o JOIN ".$db->prefix()."commande as c ON c.rowid = o.fk_commande LEFT JOIN ".$db->prefix()."facture as f ON f.rowid = o.fk_facture";
+	$sql .= " WHERE o.entity = ".((int) $conf->entity)." AND o.order_ids LIKE '%".$db->escape((string) $id)."%'";
+	$rows = meli_test_rows($sql);
+	print json_encode(empty($rows) ? null : $rows[0])."\n";
+	exit(0);
+}
+
 if ($command === 'secret') {
 	$rows = meli_test_rows("SELECT value FROM ".$db->prefix()."const WHERE name = 'MELI_APP_SECRET' AND entity = ".((int) $conf->entity));
 	$stored = empty($rows) ? '' : $rows[0]['value'];
@@ -90,6 +160,13 @@ if ($command === 'teardown') {
 	foreach (is_array($items) ? $items : array() as $item) {
 		if (preg_match('/^MLA\d+$/', $item)) {
 			$db->query("DELETE FROM ".$db->prefix()."meli_link WHERE item_id = '".$db->escape($item)."'");
+		}
+	}
+	// Notifications of the fake's resources this run created (/orders/…, /shipments/…).
+	$resources = is_file($work.'/resources') ? file($work.'/resources', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) : array();
+	foreach (is_array($resources) ? $resources : array() as $resource) {
+		if (preg_match('#^/(orders|shipments)/\d+$#', $resource)) {
+			$db->query("DELETE FROM ".$db->prefix()."meli_inbox WHERE resource = '".$db->escape($resource)."'");
 		}
 	}
 	$tag = is_file($work.'/tag') ? trim((string) file_get_contents($work.'/tag')) : '';
