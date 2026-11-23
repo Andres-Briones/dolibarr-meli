@@ -9,3 +9,12 @@ MeliDescription=Links your Mercado Libre listings to your products: stock, sales
 MeliConnected=The Mercado Libre account is connected.
 MeliConnectRefused=Mercado Libre did not authorise the connection (%s).
 MeliConnectFailed=The account could not be connected: %s
+MeliBuyerId=Mercado Libre buyer id
+
+# Scheduled jobs
+MeliCronQueue=Mercado Libre: notifications and stock
+MeliCronQueueDesc=Processes the notifications received from Mercado Libre and sends the quantities of the products that changed.
+MeliCronPolling=Mercado Libre: sales check
+MeliCronPollingDesc=Fetches the notifications Mercado Libre could not deliver and the sales updated since the last run, and reads open shipments.
+MeliCronNightly=Mercado Libre: daily review
+MeliCronNightlyDesc=Reads the listings again, sends the stock of every linked product again and deletes old data.

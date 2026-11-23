@@ -9,3 +9,12 @@ MeliDescription=Vincula tus publicaciones de Mercado Libre con tus productos: st
 MeliConnected=La cuenta de Mercado Libre quedó conectada.
 MeliConnectRefused=Mercado Libre no autorizó la conexión (%s).
 MeliConnectFailed=No se pudo conectar la cuenta: %s
+MeliBuyerId=Id de comprador en Mercado Libre
+
+# Scheduled jobs
+MeliCronQueue=Mercado Libre: notificaciones y stock
+MeliCronQueueDesc=Procesa las notificaciones recibidas de Mercado Libre y envía las cantidades de los productos que cambiaron.
+MeliCronPolling=Mercado Libre: control de ventas
+MeliCronPollingDesc=Busca las notificaciones que Mercado Libre no pudo entregar y las ventas actualizadas desde la última vez, y lee los envíos abiertos.
+MeliCronNightly=Mercado Libre: revisión diaria
+MeliCronNightlyDesc=Vuelve a leer las publicaciones, reenvía el stock de todos los productos vinculados y borra datos viejos.

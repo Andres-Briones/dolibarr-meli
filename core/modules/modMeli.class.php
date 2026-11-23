@@ -71,7 +71,50 @@ class modMeli extends DolibarrModules
 		$this->tabs = array();
 		$this->dictionaries = array();
 		$this->boxes = array();
-		$this->cronjobs = array();
+		$this->cronjobs = array(
+			0 => array(
+				'label' => 'MeliCronQueue',
+				'jobtype' => 'method',
+				'class' => '/meli/class/melicron.class.php',
+				'objectname' => 'MeliCron',
+				'method' => 'runQueue',
+				'parameters' => '',
+				'comment' => 'MeliCronQueueDesc',
+				'frequency' => 1,
+				'unitfrequency' => 60,
+				'status' => 1,
+				'test' => 'isModEnabled("meli")',
+				'priority' => 50,
+			),
+			1 => array(
+				'label' => 'MeliCronPolling',
+				'jobtype' => 'method',
+				'class' => '/meli/class/melicron.class.php',
+				'objectname' => 'MeliCron',
+				'method' => 'runPolling',
+				'parameters' => '',
+				'comment' => 'MeliCronPollingDesc',
+				'frequency' => 1,
+				'unitfrequency' => 3600,
+				'status' => 1,
+				'test' => 'isModEnabled("meli")',
+				'priority' => 51,
+			),
+			2 => array(
+				'label' => 'MeliCronNightly',
+				'jobtype' => 'method',
+				'class' => '/meli/class/melicron.class.php',
+				'objectname' => 'MeliCron',
+				'method' => 'runNightly',
+				'parameters' => '',
+				'comment' => 'MeliCronNightlyDesc',
+				'frequency' => 1,
+				'unitfrequency' => 86400,
+				'status' => 1,
+				'test' => 'isModEnabled("meli")',
+				'priority' => 52,
+			),
+		);
 		$this->rights = array();
 		$this->menu = array();
 	}
@@ -89,6 +132,28 @@ class modMeli extends DolibarrModules
 			return 0;
 		}
 
-		return $this->_init(array(), $options);
+		/** @var Conf $conf */
+		global $conf;
+
+		// Buyers are found again by their Mercado Libre id when they gave no document.
+		include_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
+		$extrafields = new ExtraFields($this->db);
+		if ($extrafields->addExtraField('meli_buyer_id', 'MeliBuyerId', 'varchar', 900, '32', 'thirdparty', 0, 0, '', '', 0, '', '0', '', '', '', 'meli@meli', 'isModEnabled("meli")') <= 0) {
+			$this->error = $extrafields->error;
+			return 0;
+		}
+
+		// The payment mode of sales paid on Mercado Libre, for customers only. An existing one, even
+		// renamed or disabled by an administrator, is left as it is; disabling the module keeps it.
+		$sql = array();
+		$resql = $this->db->query("SELECT id FROM ".$this->db->prefix()."c_paiement WHERE code = 'MELI' AND entity = ".((int) $conf->entity));
+		if ($resql && $resql !== true && !is_array($this->db->fetch_array($resql))) {
+			$sql[] = array(
+				'sql' => "INSERT INTO ".$this->db->prefix()."c_paiement (entity, code, libelle, type, active, module) VALUES (".((int) $conf->entity).", 'MELI', 'Mercado Libre', 0, 1, 'meli')",
+				'ignoreerror' => 1,
+			);
+		}
+
+		return $this->_init($sql, $options);
 	}
 }
