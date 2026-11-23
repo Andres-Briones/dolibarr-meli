@@ -345,7 +345,7 @@ class MeliFixtures
 	/**
 	 * Record a record the module created for this run (a third party, an order, an invoice).
 	 *
-	 * @param	string	$kind	thirdparty, order or invoice
+	 * @param	string	$kind	Kind of record (product, warehouse, thirdparty, order, invoice, bank)
 	 * @param	int		$id		Id
 	 * @return	void
 	 */
@@ -393,21 +393,7 @@ class MeliFixtures
 		$orderList = empty($this->ids['order']) ? '0' : implode(',', $this->ids['order']);
 		$db->query("DELETE FROM ".$prefix."meli_order WHERE fk_commande IN (".$orderList.")");
 
-		foreach (array_reverse($this->ids['invoice']) as $id) {
-			$invoice = new Facture($db);
-			if ($invoice->fetch($id) > 0 && in_array((int) $invoice->socid, $this->ids['thirdparty'], true)) {
-				// Payments first: a paid invoice cannot be deleted.
-				foreach (meli_test_rows("SELECT pf.fk_paiement FROM ".$prefix."paiement_facture as pf WHERE pf.fk_facture = ".((int) $id)) as $row) {
-					$payment = new Paiement($db);
-					if ($payment->fetch((int) $row['fk_paiement']) > 0) {
-						$payment->delete($user);
-					}
-				}
-				if ($invoice->delete($user) <= 0) {
-					$failed[] = 'invoice '.$id;
-				}
-			}
-		}
+		$failed = array_merge($failed, $this->deleteInvoices());
 		foreach (array_reverse($this->ids['order']) as $id) {
 			$order = new Commande($db);
 			if ($order->fetch($id) > 0 && in_array((int) $order->socid, $this->ids['thirdparty'], true)) {
@@ -459,6 +445,96 @@ class MeliFixtures
 		if (!empty($failed)) {
 			// Loud on purpose: a leftover must be seen and removed by hand, not pile up.
 			throw new RuntimeException('test records left behind ('.$this->tag.'): '.implode(', ', $failed));
+		}
+	}
+
+	/**
+	 * Delete this run's invoices with their payments and bank lines.
+	 *
+	 * Through SQL: core refuses to delete a payment of a paid invoice, a validated invoice that is not
+	 * the last of its numbering, and on 24 fails on instances without the accounting tables. Only
+	 * invoices whose customer is a third party of this run, named with its marker, are touched.
+	 *
+	 * @return	list<string>	What could not be deleted
+	 */
+	private function deleteInvoices()
+	{
+		/** @var DoliDB $db */
+		global $db;
+
+		$prefix = $db->prefix();
+		$socs = empty($this->ids['thirdparty']) ? '0' : implode(',', $this->ids['thirdparty']);
+		$ours = "SELECT s.rowid FROM ".$prefix."societe as s WHERE s.rowid IN (".$socs.") AND s.nom LIKE '".$db->escape($this->tag)."%'";
+		$candidates = empty($this->ids['invoice']) ? '0' : implode(',', $this->ids['invoice']);
+		$ids = array();
+		foreach (meli_test_rows("SELECT f.rowid FROM ".$prefix."facture as f WHERE f.rowid IN (".$candidates.") AND f.fk_soc IN (".$ours.")") as $row) {
+			$ids[] = (int) $row['rowid'];
+		}
+		if (empty($ids)) {
+			return array();
+		}
+		$list = implode(',', $ids);
+		$payments = array('0');
+		$banks = array('0');
+		foreach (meli_test_rows("SELECT p.rowid, p.fk_bank FROM ".$prefix."paiement as p JOIN ".$prefix."paiement_facture as pf ON pf.fk_paiement = p.rowid WHERE pf.fk_facture IN (".$list.")") as $row) {
+			$payments[] = (string) (int) $row['rowid'];
+			$banks[] = (string) (int) $row['fk_bank'];
+		}
+		$statements = array(
+			"DELETE FROM ".$prefix."bank_url WHERE fk_bank IN (".implode(',', $banks).")",
+			"DELETE FROM ".$prefix."bank WHERE rowid IN (".implode(',', $banks).")",
+			"DELETE FROM ".$prefix."paiement_facture WHERE fk_paiement IN (".implode(',', $payments).")",
+			"DELETE FROM ".$prefix."paiement WHERE rowid IN (".implode(',', $payments).")",
+			"DELETE FROM ".$prefix."element_element WHERE (sourcetype = 'facture' AND fk_source IN (".$list.")) OR (targettype = 'facture' AND fk_target IN (".$list."))",
+			"DELETE FROM ".$prefix."ecm_files WHERE src_object_type IN ('facture', 'invoice') AND src_object_id IN (".$list.")",
+			"DELETE FROM ".$prefix."facturedet_extrafields WHERE fk_object IN (SELECT rowid FROM ".$prefix."facturedet WHERE fk_facture IN (".$list."))",
+			"DELETE FROM ".$prefix."facturedet WHERE fk_facture IN (".$list.")",
+			"DELETE FROM ".$prefix."facture_extrafields WHERE fk_object IN (".$list.")",
+			"DELETE FROM ".$prefix."facture WHERE rowid IN (".$list.")",
+		);
+		$failed = array();
+		// The arca module, when enabled, queued these invoices for a CAE: its rows go with them.
+		if ($db->query("SELECT rowid FROM ".$prefix."arca_voucher WHERE 1 = 0", 1)) {
+			array_unshift($statements, "DELETE FROM ".$prefix."arca_attempt WHERE fk_voucher IN (SELECT rowid FROM ".$prefix."arca_voucher WHERE fk_facture IN (".$list."))", "DELETE FROM ".$prefix."arca_voucher WHERE fk_facture IN (".$list.")");
+		}
+		foreach ($statements as $sql) {
+			if (!$db->query($sql)) {
+				$failed[] = 'invoices '.$list.': '.$db->lasterror();
+			}
+		}
+
+		return $failed;
+	}
+
+	/**
+	 * Take over the records of an earlier run with another marker (to remove what it left behind).
+	 *
+	 * @param	string	$tag	Marker of that run
+	 * @return	void
+	 */
+	public function takeOver($tag)
+	{
+		/** @var DoliDB $db */
+		global $db;
+
+		if (strpos($tag, 'MELITEST') !== 0) {
+			throw new LogicException('not a marker of these tests');
+		}
+		$this->tag = $tag;
+		$prefix = $db->prefix();
+		$like = "'".$db->escape($tag)."%'";
+		$queries = array(
+			'product' => "SELECT rowid as id FROM ".$prefix."product WHERE ref LIKE ".$like,
+			'warehouse' => "SELECT rowid as id FROM ".$prefix."entrepot WHERE ref LIKE ".$like,
+			'thirdparty' => "SELECT rowid as id FROM ".$prefix."societe WHERE nom LIKE ".$like,
+			'bank' => "SELECT rowid as id FROM ".$prefix."bank_account WHERE label = '".$db->escape($tag)." bank'",
+			'order' => "SELECT c.rowid as id FROM ".$prefix."commande as c JOIN ".$prefix."societe as s ON s.rowid = c.fk_soc WHERE s.nom LIKE ".$like,
+			'invoice' => "SELECT f.rowid as id FROM ".$prefix."facture as f JOIN ".$prefix."societe as s ON s.rowid = f.fk_soc WHERE s.nom LIKE ".$like,
+		);
+		foreach ($queries as $kind => $sql) {
+			foreach (meli_test_rows($sql) as $row) {
+				$this->adopt($kind, (int) $row['id']);
+			}
 		}
 	}
 
