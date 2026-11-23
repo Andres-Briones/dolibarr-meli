@@ -55,7 +55,9 @@ class modMeli extends DolibarrModules
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'fa-store-alt';
 
-		$this->module_parts = array();
+		$this->module_parts = array(
+			'triggers' => 1,
+		);
 		$this->dirs = array('/meli');
 		$this->config_page_url = array('setup.php@meli');
 		$this->depends = array('modProduct', 'modCommande', 'modSociete');
