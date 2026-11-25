@@ -1,5 +1,10 @@
 # Meli — Mercado Libre for Dolibarr
 
+> **Work in progress, not yet tested.** Version 0.1.0 has only been run on
+> development instances against a test double of Mercado Libre's API, never in
+> a real installation. The module id (510104) is provisional and will change
+> before a release. Do not use it in production yet.
+
 Links the listings of a Mercado Libre seller account to Dolibarr products:
 Dolibarr's stock is offered on Mercado Libre, sales paid there become
 Dolibarr orders (invoiced and paid by default), and shipments and labels
